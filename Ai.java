@@ -1,201 +1,248 @@
+/*
+* Creates a AI object that gives the best move
+* @author Roman Navarrete, Lucas Huang, Mohamed Jammal, Jeremy Kwan
+* @version 17.0.5
+* @since 2023-01-14
+*/
+
 import java.util.*;
 import com.rits.cloning.*;
+
 class Ai {
-  Cloner cloner=new Cloner();
-  // check every piece's moves
-  // get highest move for each piece
-  //
-  // return piece and move
+  private Cloner cloner = new Cloner();
+  // easier to have strings as hashmap keys
+  private HashMap<String, Integer> gameStates = new HashMap<String, Integer>();
+
+  /*
+   * Return best possible move for ai
+   * 
+   * @param gameBoard - Gameboard type - current gameboard
+   * 
+   * @return List<int[]> - holds best piece and move
+   */
   public List<int[]> miniMax(Gameboard gameBoard) {
     int[] bestMove = null;
     int[] bestPiece = null;
     int[] location = null;
     int[] move = null;
     int greatestHeurisiticValue = Integer.MIN_VALUE;
+
     List<Piece> possiblePieces = gameBoard.piecesThatCanMove("mouse");
     for (int i = 0; i < possiblePieces.size(); i++) {
       List<int[]> possibleMoves = possiblePieces.get(i).validMoves(gameBoard);
       for (int j = 0; j < possibleMoves.size(); j++) {
         Gameboard gameBoardTemp = cloner.deepClone(gameBoard);
-        List<int[]> possibleMovesTemp = cloner.deepClone(possibleMoves);
-        List<Piece> possiblePiecesTemp = cloner.deepClone(possiblePieces);
-        System.out.println(gameBoardTemp);
-        location = possiblePieces.get(i).getPosition();
-        move = possibleMoves.get(j);
-        //System.out.println(possiblePieces.get(i));
-        //System.out.println(Arrays.toString(possiblePieces.get(i).getPosition()) +""+Arrays.toString(possibleMoves.get(j)));
-        System.out.println(Arrays.toString(possibleMoves.get(j)) +""+Arrays.toString(possiblePieces.get(i).getPosition()));
+        // loop through every possible move each piece can make
+        // save piece and move with the highest minimax value
+        List<Piece> possiblePiecesTemp = gameBoardTemp.piecesThatCanMove("mouse");
+        List<int[]> possibleMovesTemp = possiblePiecesTemp.get(i).validMoves(gameBoardTemp);
+        location = possiblePiecesTemp.get(i).getPosition();
+        move = possibleMovesTemp.get(j);
         gameBoardTemp.setPiece(possibleMovesTemp.get(j), possiblePiecesTemp.get(i));
-        /*
-        if (miniMaxHelper(gameBoardTemp, 10, false) > greatestHeurisiticValue) {
+        int miniMaxOnMove = miniMaxHelper(gameBoardTemp, 8, Integer.MIN_VALUE, Integer.MAX_VALUE, false);
+        if (miniMaxOnMove > greatestHeurisiticValue) {
           bestPiece = location;
           bestMove = move;
+          greatestHeurisiticValue = miniMaxOnMove;
         }
-*/
       }
     }
     List<int[]> pieceAndMove = new ArrayList<int[]>();
     pieceAndMove.add(bestPiece);
     pieceAndMove.add(bestMove);
+    // return best piece and move
     return pieceAndMove;
   }
 
-  public int miniMaxHelper(Gameboard gameBoard, int depth, Boolean isMaximizing){
-    Game game = new Game("cat","mouse");
-    if(game.hasWon(gameBoard).equals("cat")){
-      return -12;
-    }else if(game.hasWon(gameBoard).equals("mouse")){
-      return 12;
-    }else if(depth == 0){
-      return (gameBoard.getMousePieces().size()-gameBoard.getCatPieces().size());
+  /*
+   * Evaluate minimax value of current position
+   * 
+   * @param gameBoard - Gameboard type - current gameboard
+   * 
+   * @param depth - how many moves left to search
+   * 
+   * @param alpha - alpha value
+   * 
+   * @param beta - beta value
+   * 
+   * @param isMaximizing - boolean - if current player is maximizing
+   */
+  public int miniMaxHelper(Gameboard gameBoard, int depth, int alpha, int beta, Boolean isMaximizing) {
+    Game game = new Game("cat", "mouse");
+    if (game.hasWon(gameBoard).equals("cat")) {
+      return -1000;
+    } else if (game.hasWon(gameBoard).equals("mouse")) {
+      return 1000;
+    } else if (depth == 0) {
+      // heuristic value
+      // give points based on how many pieces are left
+      int currentMouseScore = 0;
+      List<Piece> mousePieces = gameBoard.getMousePieces();
+      for (int i = 0; i < mousePieces.size(); i++) {
+        if (mousePieces.get(i) instanceof King) {
+          currentMouseScore += 10;
+        } else {
+          currentMouseScore += 5;
+        }
+      }
+      int currentCatScore = 0;
+      List<Piece> catPieces = gameBoard.getCatPieces();
+      for (int i = 0; i < catPieces.size(); i++) {
+        if (catPieces.get(i) instanceof King) {
+          currentCatScore += 10;
+        } else {
+          currentCatScore += 5;
+        }
+      }
+      // give points for controlling middle
+      List<int[]> middleSquares = new ArrayList<int[]>();
+      middleSquares.add(new int[] { 2, 3 });
+      middleSquares.add(new int[] { 2, 5 });
+      middleSquares.add(new int[] { 3, 2 });
+      middleSquares.add(new int[] { 3, 4 });
+      middleSquares.add(new int[] { 4, 3 });
+      middleSquares.add(new int[] { 4, 5 });
+      middleSquares.add(new int[] { 5, 2 });
+      middleSquares.add(new int[] { 5, 4 });
+      for (int i = 0; i < middleSquares.size(); i++) {
+        Piece currentSquare = gameBoard.getPiece(middleSquares.get(i));
+        if (currentSquare != null && currentSquare.getTeam().equals("cat")) {
+          currentCatScore += 1;
+        } else if (currentSquare != null && currentSquare.getTeam().equals("mouse")) {
+          currentMouseScore += 1;
+        }
+
+      }
+      // give points for keeping back row intact
+      Piece backRowCat1 = gameBoard.getPiece(new int[] { 7, 2 });
+      if (backRowCat1 != null && backRowCat1.getTeam().equals("cat")) {
+        currentCatScore += 3;
+      }
+      Piece backRowCat2 = gameBoard.getPiece(new int[] { 7, 6 });
+      if (backRowCat2 != null && backRowCat2.getTeam().equals("cat")) {
+        currentCatScore += 3;
+      }
+      Piece backRowMouse1 = gameBoard.getPiece(new int[] { 0, 1 });
+      if (backRowMouse1 != null && backRowMouse1.getTeam().equals("mouse")) {
+        currentMouseScore += 3;
+      }
+      Piece backRowMouse2 = gameBoard.getPiece(new int[] { 0, 5 });
+      if (backRowMouse2 != null && backRowMouse2.getTeam().equals("mouse")) {
+        currentMouseScore += 3;
+      }
+      // include depth to encourage faster wins
+      return currentMouseScore - currentCatScore + depth;
     }
-    Gameboard gameBoardTemp;
-    if(isMaximizing){
+
+    Gameboard gameBoardTemp = null;
+
+    if (isMaximizing) {
       int value = Integer.MIN_VALUE;
-      List<List<int[]>> allPieceAndMoves = new ArrayList<List<int[]>>();
-      for(int i = 0; i<gameBoard.piecesThatCanMove("mouse").size();i++){
-        List<int[]> possibleMoves = gameBoard.piecesThatCanMove("mouse").get(i).validMoves(gameBoard);
-        for(int j = 0; j < possibleMoves.size(); j++){
+      List<List<int[]>> allPiecesAndMoves = new ArrayList<List<int[]>>();
+      List<Piece> possiblePieces = gameBoard.piecesThatCanMove("mouse");
+      // collect all possible moves
+      for (int i = 0; i < possiblePieces.size(); i++) {
+        Piece currentPiece = possiblePieces.get(i);
+        List<int[]> possibleMoves = currentPiece.validMoves(gameBoard);
+        for (int j = 0; j < possibleMoves.size(); j++) {
           List<int[]> pieceAndMove = new ArrayList<int[]>();
-          int[]location = gameBoard.piecesThatCanMove("mouse").get(i).getPosition();
-          int[]move = possibleMoves.get(j);
+          int[] location = currentPiece.getPosition();
+          int[] move = possibleMoves.get(j);
           pieceAndMove.add(location);
           pieceAndMove.add(move);
-          allPieceAndMoves.add(pieceAndMove);
+          allPiecesAndMoves.add(pieceAndMove);
         }
       }
-
-      for(int i = 0;i<allPieceAndMoves.size();i++){
+      // go through every possible move
+      for (int i = 0; i < allPiecesAndMoves.size(); i++) {
         gameBoardTemp = cloner.deepClone(gameBoard);
         int noOfCatPieces = gameBoard.getCatPieces().size();
         int noOfMousePieces = gameBoard.getMousePieces().size();
         int totalPieces = noOfCatPieces + noOfMousePieces;
-        gameBoardTemp.setPiece(allPieceAndMoves.get(i).get(1),gameBoardTemp.getPiece(allPieceAndMoves.get(i).get(0)));
-        int newNoOfCatPieces = gameBoard.getCatPieces().size();
-        int newNoOfMousePieces = gameBoard.getMousePieces().size();
+
+        gameBoardTemp.setPiece(allPiecesAndMoves.get(i).get(1),
+            gameBoardTemp.getPiece(allPiecesAndMoves.get(i).get(0)));
+        int newNoOfCatPieces = gameBoardTemp.getCatPieces().size();
+        int newNoOfMousePieces = gameBoardTemp.getMousePieces().size();
         int newTotalPieces = newNoOfCatPieces + newNoOfMousePieces;
-        if(newTotalPieces == totalPieces || gameBoard.getLastPlayedPiece().possibleCaptures(gameBoard).isEmpty() == true ){
-          value = Math.max(value, miniMaxHelper(gameBoardTemp, depth - 1, false));
-        }else{
-          value = Math.max(value, miniMaxHelper(gameBoardTemp, depth - 1, true));
+        String currentGameState = Arrays.deepToString(gameBoardTemp.boardToString());
+        if (newTotalPieces == totalPieces
+            || gameBoardTemp.getLastPlayedPiece().possibleCaptures(gameBoardTemp).isEmpty() == true) {
+
+          if (gameStates.containsKey(currentGameState)) {
+            value = Math.max(value, gameStates.get(currentGameState));
+          } else {
+            value = Math.max(value, miniMaxHelper(gameBoardTemp, depth - 1, alpha, beta, false));
+            // add to hashmap if not found
+            gameStates.put(Arrays.deepToString(gameBoardTemp.boardToString()), value);
+          }
+
+        } else {
+          if (gameStates.containsKey(currentGameState)) {
+            value = Math.max(value, gameStates.get(currentGameState));
+          } else {
+            value = Math.max(value, miniMaxHelper(gameBoardTemp, depth - 1, alpha, beta, true));
+            gameStates.put(Arrays.deepToString(gameBoardTemp.boardToString()), value);
+          }
         }
+        if (value > beta) {
+          i = allPiecesAndMoves.size();
+        }
+        alpha = Math.max(alpha, value);
       }
-      
-    }else{
+      return value;
+    } else {
+      // same as above but for opposing player
       int value = Integer.MAX_VALUE;
-      List<List<int[]>> allPieceAndMoves = new ArrayList<List<int[]>>();
-      for(int i = 0; i<gameBoard.piecesThatCanMove("cat").size();i++){
-        List<int[]> possibleMoves = gameBoard.piecesThatCanMove("cat").get(i).validMoves(gameBoard);
-        for(int j = 0; j < possibleMoves.size(); j++){
+      List<List<int[]>> allPiecesAndMoves = new ArrayList<List<int[]>>();
+      List<Piece> possiblePieces = gameBoard.piecesThatCanMove("cat");
+      for (int i = 0; i < possiblePieces.size(); i++) {
+        Piece currentPiece = possiblePieces.get(i);
+        List<int[]> possibleMoves = currentPiece.validMoves(gameBoard);
+        for (int j = 0; j < possibleMoves.size(); j++) {
           List<int[]> pieceAndMove = new ArrayList<int[]>();
-          int[]location = gameBoard.piecesThatCanMove("cat").get(i).getPosition();
-          int[]move = possibleMoves.get(j);
+          int[] location = currentPiece.getPosition();
+          int[] move = possibleMoves.get(j);
           pieceAndMove.add(location);
           pieceAndMove.add(move);
-          allPieceAndMoves.add(pieceAndMove);
+          allPiecesAndMoves.add(pieceAndMove);
         }
       }
 
-      for(int i = 0;i<allPieceAndMoves.size();i++){
+      for (int i = 0; i < allPiecesAndMoves.size(); i++) {
         gameBoardTemp = cloner.deepClone(gameBoard);
         int noOfCatPieces = gameBoard.getCatPieces().size();
         int noOfMousePieces = gameBoard.getMousePieces().size();
         int totalPieces = noOfCatPieces + noOfMousePieces;
-        gameBoardTemp.setPiece(allPieceAndMoves.get(i).get(1),gameBoardTemp.getPiece(allPieceAndMoves.get(i).get(0)));
-        int newNoOfCatPieces = gameBoard.getCatPieces().size();
-        int newNoOfMousePieces = gameBoard.getMousePieces().size();
+        gameBoardTemp.setPiece(allPiecesAndMoves.get(i).get(1),
+            gameBoardTemp.getPiece(allPiecesAndMoves.get(i).get(0)));
+        int newNoOfCatPieces = gameBoardTemp.getCatPieces().size();
+        int newNoOfMousePieces = gameBoardTemp.getMousePieces().size();
         int newTotalPieces = newNoOfCatPieces + newNoOfMousePieces;
-        if(newTotalPieces == totalPieces || gameBoard.getLastPlayedPiece().possibleCaptures(gameBoard).isEmpty() == true ){
-          value = Math.max(value, miniMaxHelper(gameBoardTemp, depth - 1, true));
-        }else{
-          value = Math.max(value, miniMaxHelper(gameBoardTemp, depth - 1, false));
+        String currentGameState = Arrays.deepToString(gameBoardTemp.boardToString());
+        if (newTotalPieces == totalPieces
+            || gameBoardTemp.getLastPlayedPiece().possibleCaptures(gameBoardTemp).isEmpty() == true) {
+          if (gameStates.containsKey(currentGameState)) {
+            value = Math.min(value, gameStates.get(currentGameState));
+          } else {
+            value = Math.min(value, miniMaxHelper(gameBoardTemp, depth - 1, alpha, beta, true));
+            gameStates.put(Arrays.deepToString(gameBoardTemp.boardToString()), value);
+          }
+        } else {
+          if (gameStates.containsKey(currentGameState)) {
+            value = Math.min(value, gameStates.get(currentGameState));
+          } else {
+            value = Math.min(value, miniMaxHelper(gameBoardTemp, depth - 1, alpha, beta, false));
+            gameStates.put(Arrays.deepToString(gameBoardTemp.boardToString()), value);
+          }
         }
+        if (value < alpha) {
+          i = allPiecesAndMoves.size();
+        }
+        beta = Math.min(beta, value);
       }
       return value;
     }
-    return 21;
+
   }
-
-
-  
 }
-/*
- * function minimax( node, depth, maximizingPlayer ) is
- * if depth = 0 or node is a terminal node then
- * return the heuristic value of node
- * if maximizingPlayer then
- * value := −∞
- * for each child of node do
- * value := max( value, minimax( child, depth − 1, FALSE ) )
- * return value
- * else (* minimizing player *)
- * value := +∞
- * for each child of node do
- * value := min( value, minimax( child, depth − 1, TRUE ) )
- * return value
- * 
- * 
- * 
- * 
- * 
- * public static int minimax(int stones) {
- * // make arraylist allMoves of size 3, with the values 1, 2, 3 representing
- * the
- * // possible moves respectively for each index
- * ArrayList<Integer> allMoves = new ArrayList<Integer>(Arrays.asList(1, 2, 3));
- * // remove moves that aren't possible (moves that would cause the pile to go
- * // below 0)
- * for (int i = allMoves.size() - 1; i >= 0; i--) {
- * if (stones - allMoves.get(i) < 0) {
- * allMoves.remove(i);
- * }
- * }
- * // calls minimaxHelper on each possible move and replaces it with the value
- * // minimaxHelper returns
- * for (int i = 0; i < allMoves.size(); i++) {
- * allMoves.set(i, minimaxHelper(stones - allMoves.get(i), false));
- * }
- * // return the index with the highest minimaxHelper score + 1 (as indexes
- * start
- * // at 0)
- * return allMoves.indexOf(Collections.max(allMoves)) + 1;
- * }
- * 
- * /*
- * Give the minimax score of the current game
- * 
- * @param node - int type - number of stones remaining in the pile
- * 
- * @param maximizingPlayer - Boolean type - if the current player is the
- * maximizing player
- * 
- * @return int - minimax score of current game
- */
-/*
- * public static int minimaxHelper(int node, boolean maximizingPlayer) {
- * if (node == 0) {
- * if (maximizingPlayer) {
- * return -1;
- * } else {
- * return 1;
- * }
- * }
- * if (maximizingPlayer) {
- * int value = Integer.MIN_VALUE;
- * for (int i = 1; i <= 3; i++) {
- * if (node - i >= 0) {
- * value = Math.max(value, minimaxHelper(node - i, false));
- * }
- * }
- * return value;
- * } else {
- * int value = Integer.MAX_VALUE;
- * for (int i = 1; i <= 3; i++) {
- * if (node - i >= 0) {
- * value = Math.min(value, minimaxHelper(node - i, true));
- * }
- * }
- * return value;
- * }
- * }
- */
